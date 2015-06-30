@@ -24,17 +24,24 @@
 
 #include <iostream>
 
-#include <llvm/Analysis/Verifier.h>
+
+#include <llvm/LinkAllPasses.h>
 #include <llvm/Bitcode/ReaderWriter.h>
-#include <llvm/CodeGen/Passes.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/PassManager.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/CommandLine.h>
-#include <llvm/Support/FormattedStream.h>
-#include <llvm/Support/system_error.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/Transforms/Scalar.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/ManagedStatic.h>
+#include <llvm/Support/PrettyStackTrace.h>
+#include <llvm/Support/Signals.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/ToolOutputFile.h>
+#include <llvm/Support/raw_ostream.h>
+
 
 using namespace llvm;
 
@@ -57,23 +64,20 @@ cl::opt<DebugLevel> debugLevel(cl::desc("Debugging level:"), cl::init(g1),
 
 int main(int argc, char **argv) {
     cl::ParseCommandLineOptions(argc, argv, "LLJVM Backend\n");
-    std::string err;
-	OwningPtr<MemoryBuffer> buf;
-	error_code errcode;
 
-    errcode = MemoryBuffer::getFileOrSTDIN(input, buf);
-    if(errcode) {
+    ErrorOr<std::unique_ptr<MemoryBuffer>> buf = MemoryBuffer::getFileOrSTDIN(input);
+    if(std::error_code errcode = buf.getError()) {
         std::cerr << "Unable to open bitcode file: " << errcode << std::endl;
         return 1;
     }
-    
-    Module *mod = ParseBitcodeFile(buf.get(), getGlobalContext(), &err);
-    if(!mod) {
+
+    ErrorOr<llvm::Module *> mod = llvm::parseBitcodeFile(
+        buf.get().get()->getMemBufferRef(), getGlobalContext());
+    if(std::error_code err = mod.getError()) {
         std::cerr << "Unable to parse bitcode file: " << err << std::endl;
         return 1;
     }
 
-    // Initialize passes
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializeCore(Registry);
     initializeScalarOpts(Registry);
@@ -84,21 +88,24 @@ int main(int argc, char **argv) {
     initializeInstCombine(Registry);
     initializeTarget(Registry);
 
-    PassManager pm;
     DataLayout td("e-p:32:32:32"
                   "-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64"
                   "-f32:32:32-f64:64:64");
-	JVMWriter *jvw;
-    pm.add(new DataLayout(td));
+    (*mod.get()).setDataLayout(td);
+
+    legacy::PassManager pm;
     pm.add(createVerifierPass());
     pm.add(createGCLoweringPass());
     pm.add(createCFGSimplificationPass());
     // TODO: fix switch generation so the following pass is not needed
     pm.add(createLowerSwitchPass());
-	jvw = (JVMWriter *)tmp.createPass();
-	jvw->Setup(&td, classname, debugLevel);
+
+    JVMWriter *jvw;
+    jvw = (JVMWriter *)tmp.createPass();
+	  jvw->Setup(&td, classname, debugLevel);
+
     pm.add(jvw);
-//    pm.add(createGCInfoDeleter());
-    pm.run(*mod);
+    pm.run(*mod.get());
+
     return 0;
 }

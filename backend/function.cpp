@@ -22,7 +22,7 @@
 
 #include "backend.h"
 
-#include <llvm/Support/CallSite.h>
+#include <llvm/IR/CallSite.h>
 
 /**
  * Return a unique ID.
@@ -73,6 +73,7 @@ void JVMWriter::printOperandPack(const Instruction *inst,
     for(unsigned int i = minOperand; i < maxOperand; i++)
         size += targetData->getTypeAllocSize(
             cs.getArgument(i)->getType());
+//            inst->getOperand(i)->getType());
 
     printSimpleInstruction("bipush", utostr(size));
     printSimpleInstruction("invokestatic",
@@ -81,6 +82,7 @@ void JVMWriter::printOperandPack(const Instruction *inst,
 
     for(unsigned int i = minOperand; i < maxOperand; i++) {
         const Value *v = cs.getArgument(i);
+//        const Value *v = inst->getOperand(i);
         printValueLoad(v);
         printSimpleInstruction("invokestatic",
             "lljvm/runtime/Memory/pack(I"
@@ -102,23 +104,27 @@ void JVMWriter::printFunctionCall(const Value *functionVal,
     functionVal = ci->getCalledValue();
     if(const Function *f = dyn_cast<Function>(functionVal)) { // direct call
         const FunctionType *ty = f->getFunctionType();
-        
+
         //for(unsigned int i = origin, e = inst->getNumOperands(); i < e; i++)
         //    printValueLoad(inst->getOperand(i));
-        
+
+        ImmutableCallSite cs = ImmutableCallSite(inst);
         for(unsigned int i = 0, e = ty->getNumParams(); i < e; i++)
-            printValueLoad(ImmutableCallSite(inst).getArgument(i));
+            printValueLoad(cs.getArgument(i));
+//            printValueLoad(inst->getOperand(i + origin));
         if(ty->isVarArg() && inst)
             printOperandPack(inst, ty->getNumParams(),
                                    inst->getNumOperands() - origin);
-        
+//            printOperandPack(inst, ty->getNumParams() + origin,
+//                                   inst->getNumOperands());
+
         if(externRefs.count(f))
             printSimpleInstruction("invokestatic",
                 getValueName(f) + getCallSignature(ty));
         else
             printSimpleInstruction("invokestatic",
                 classname + "/" + getValueName(f) + getCallSignature(ty));
-        
+
         if(getValueName(f) == "setjmp") {
             unsigned int varNum = usedRegisters++;
             printSimpleInstruction("istore", utostr(varNum));
@@ -129,7 +135,10 @@ void JVMWriter::printFunctionCall(const Value *functionVal,
         printValueLoad(functionVal);
         const FunctionType *ty = cast<FunctionType>(
             cast<PointerType>(functionVal->getType())->getElementType());
-        printOperandPack(inst, origin, inst->getNumOperands() - origin);
+        //out << "; inst->getNumOperands()=" << inst->getNumOperands();
+//        printOperandPack(inst, origin, inst->getNumOperands() - origin);
+        printOperandPack(inst, origin - 1, inst->getNumOperands() - origin);
+//        printOperandPack(inst, origin, inst->getNumOperands());
         printSimpleInstruction("invokestatic",
             "lljvm/runtime/Function/invoke_"
             + getTypePostfix(ty->getReturnType()) + "(II)"
@@ -171,6 +180,9 @@ void JVMWriter::printIntrinsicCall(const IntrinsicInst *inst) {
     case Intrinsic::invariant_end:
         // ignore lifetime intrinsics
         break;
+    case Intrinsic::expect:
+        printValueLoad(inst->getOperand(1));
+        break;
     default:
         errs() << "Intrinsic = " << *inst << '\n';
         llvm_unreachable("Invalid intrinsic function");
@@ -195,7 +207,7 @@ void JVMWriter::printCallInstruction(const Instruction *inst) {
  * @param inst  the instruction
  */
 void JVMWriter::printInvokeInstruction(const InvokeInst *inst) {
-    std::string labelname = getUID() + "$invoke";
+    std::string labelname = std::to_string(getUID()) + "$invoke";
     printLabel(labelname + "_begin");
     printFunctionCall(inst->getOperand(0), inst);
     if(!inst->getType()->isVoidTy())
@@ -245,7 +257,7 @@ void JVMWriter::printLocalVariable(const Function &f,
  */
 void JVMWriter::printFunctionBody(const Function &f) {
     for(Function::const_iterator i = f.begin(), e = f.end(); i != e; i++) {
-        if(Loop *l = getAnalysis<LoopInfo>().getLoopFor(i)) {
+        if(Loop *l = getAnalysis<LoopInfoWrapperPass>().getLoopInfo().getLoopFor(i)) {
             if(l->getHeader() == i && l->getParentLoop() == 0)
                 printLoop(l);
         } else
@@ -366,3 +378,4 @@ void JVMWriter::printFunction(const Function &f) {
     printLabel("end_method");
     out << ".end method\n";
 }
+

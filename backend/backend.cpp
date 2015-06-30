@@ -53,7 +53,7 @@ void JVMWriter::Setup(const DataLayout *td, const std::string &cls,
  *            of this pass.
  */
 void JVMWriter::getAnalysisUsage(AnalysisUsage &au) const {
-    au.addRequired<LoopInfo>();
+    au.addRequired<LoopInfoWrapperPass>();
     au.setPreservesAll();
 }
 
@@ -96,12 +96,8 @@ bool JVMWriter::doInitialization(Module &m) {
                                   e = classname.end(); i != e; i++)
             if(*i == '.') *i = '_';
     }
-    
-	const MCAsmInfo *mcAsm = new MCAsmInfo();
-	const MCRegisterInfo *mcRegisterInfo = new MCRegisterInfo();
-	const MCObjectFileInfo *mcObjectFileInfo = new MCObjectFileInfo();
-	MCContext *mcc = new MCContext(*mcAsm, *mcRegisterInfo, mcObjectFileInfo);
-	mangler = new Mangler(*mcc, *targetData);
+
+  	mangler = new Mangler(targetData);
 
     printHeader();
     printFields();

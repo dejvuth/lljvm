@@ -40,7 +40,7 @@ void JVMWriter::printValueLoad(const Value *v) {
             "lljvm/runtime/Function/getFunctionPointer"
             "(Ljava/lang/String;Ljava/lang/String;)I");
     } else if(isa<GlobalVariable>(v)) {
-        const Type *ty = cast<PointerType>(v->getType())->getElementType();
+        //const Type *ty = cast<PointerType>(v->getType())->getElementType();
         if(externRefs.count(v))
             printSimpleInstruction("getstatic", getValueName(v) + " I");
         else

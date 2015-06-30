@@ -22,7 +22,7 @@
 
 #include "backend.h"
 
-#include <llvm/Support/CallSite.h>
+#include <llvm/IR/CallSite.h>
 
 /**
  * Align the given offset.
@@ -345,6 +345,8 @@ void JVMWriter::printVAIntrinsic(const IntrinsicInst *inst) {
         break;
     case Intrinsic::vaend:
         break;
+    default:
+        break;
     }
 }
 
@@ -374,6 +376,8 @@ void JVMWriter::printMemIntrinsic(const MemIntrinsic *inst) {
     case Intrinsic::memset:
         printSimpleInstruction("invokestatic",
             "lljvm/runtime/Memory/memset(IB" + lenDescriptor + "I)V"); break;
+    default:
+        break;
     }
 }
 
@@ -406,6 +410,8 @@ void JVMWriter::printMathIntrinsic(const IntrinsicInst *inst) {
     case Intrinsic::pow:
         printSimpleInstruction("invokestatic", "java/lang/Math/pow(DD)D");
         break;
+    default:
+        break;
     }
     if(f32) printSimpleInstruction("d2f");
 }
@@ -423,5 +429,8 @@ void JVMWriter::printBitIntrinsic(const IntrinsicInst *inst) {
     case Intrinsic::bswap:
         printVirtualInstruction(
             "bswap(" + typeDescriptor + ")" + typeDescriptor, value); break;
+    default:
+        break;
     }
 }
+

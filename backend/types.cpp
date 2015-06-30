@@ -99,6 +99,9 @@ std::string JVMWriter::getTypeName(const Type *ty, bool expand) {
     case 'J': return "long";
     case 'F': return "float";
     case 'D': return "double";
+    default:
+        errs() << "Type = " << ty << '\n';
+        llvm_unreachable("Invalid type");
     }
 }
 
@@ -158,5 +161,10 @@ std::string JVMWriter::getTypePrefix(const Type *ty, bool expand) {
     case 'F': return "f";
     case 'D': return "d";
     case 'V': llvm_unreachable("void has no prefix");
+    default:
+        errs() << "TypeID = " << ty->getTypeID() << '\n';
+        llvm_unreachable("Invalid type");
     }
 }
+
+

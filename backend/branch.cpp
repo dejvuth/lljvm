@@ -173,7 +173,7 @@ void JVMWriter::printLoop(const Loop *l) {
     for(Loop::block_iterator i = l->block_begin(),
                              e = l->block_end(); i != e; i++) {
         const BasicBlock *block = *i;
-        Loop *blockLoop = getAnalysis<LoopInfo>().getLoopFor(block);
+        Loop *blockLoop = getAnalysis<LoopInfoWrapperPass>().getLoopInfo().getLoopFor(block);
         if(l == blockLoop)
             // the loop is the innermost parent of this block
             printBasicBlock(block);

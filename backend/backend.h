@@ -26,16 +26,16 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/StringExtras.h>
-#include <llvm/Analysis/ConstantsScanner.h>
 #include <llvm/Analysis/LoopInfo.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/GetElementPtrTypeIterator.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Mangler.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FormattedStream.h>
-#include <llvm/Support/GetElementPtrTypeIterator.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/Target/Mangler.h>
 
 
 using namespace llvm;
@@ -58,8 +58,9 @@ class JVMWriter : public FunctionPass {
     Module *module;
     /** The target data for the platform */
     const DataLayout *targetData;
-	Mangler *mangler;
-    
+
+  	Mangler *mangler;
+
     /** Set of external references */
     DenseSet<const Value*> externRefs;
     /** Mapping of blocks to unique IDs */
@@ -77,7 +78,7 @@ public:
     /** Pass ID */
     static char ID;
 
-	JVMWriter();
+	  JVMWriter();
 
     void Setup(const DataLayout *td,
               const std::string &cls, unsigned int dbg);

@@ -29,8 +29,10 @@
  * @param n  the value of the pointer
  */
 void JVMWriter::printPtrLoad(uint64_t n) {
-    if(module->getPointerSize() != Module::Pointer32)
+    if(module->getDataLayout().getPointerSize() != 4) { //Module::Pointer32)
+        fouts() << "Pointer size = " << module->getDataLayout().getPointerSize() << "\n";
         llvm_unreachable("Only 32-bit pointers are allowed");
+    }
     printConstLoad(APInt(32, n, false));
 }
 
@@ -81,14 +83,17 @@ void JVMWriter::printConstLoad(float f) {
         printSimpleInstruction("fconst_1");
     else if(f == 2.0)
         printSimpleInstruction("fconst_2");
-    else if(IsNAN(f))
+    //else if(IsNAN(f))
+    else if(isnan(f))
         printSimpleInstruction("getstatic", "java/lang/Float/NaN F");
-    else if(IsInf(f) > 0)
+    //else if(IsInf(f) > 0)
+    else if(isinf(f) > 0)
         printSimpleInstruction("getstatic",
                                "java/lang/Float/POSITIVE_INFINITY F");
-    else if(IsInf(f) < 0)
-        printSimpleInstruction("getstatic",
-                               "java/lang/Float/NEGATIVE_INFINITY F");
+    //else if(IsInf(f) < 0)
+//    else if(isinf(f) < 0) // FIXME
+//        printSimpleInstruction("getstatic",
+//                               "java/lang/Float/NEGATIVE_INFINITY F");
     else
         printSimpleInstruction("ldc", ftostr(f));
 }
@@ -103,14 +108,17 @@ void JVMWriter::printConstLoad(double d) {
         printSimpleInstruction("dconst_0");
     else if(d == 1.0)
         printSimpleInstruction("dconst_1");
-    else if(IsNAN(d))
+    //else if(IsNAN(d))
+    else if(isnan(d))
         printSimpleInstruction("getstatic", "java/lang/Double/NaN D");
-    else if(IsInf(d) > 0)
+    //else if(IsInf(d) > 0)
+    else if(isinf(d) > 0)
         printSimpleInstruction("getstatic",
                                "java/lang/Double/POSITIVE_INFINITY D");
-    else if(IsInf(d) < 0)
-        printSimpleInstruction("getstatic",
-                               "java/lang/Double/NEGATIVE_INFINITY D");
+    //else if(IsInf(d) < 0)
+//    else if(isinf(d) < 0) // FIXME
+//        printSimpleInstruction("getstatic",
+//                               "java/lang/Double/NEGATIVE_INFINITY D");
     else
         printSimpleInstruction("ldc2_w", ftostr(d));
 }
@@ -300,3 +308,4 @@ void JVMWriter::printConstantExpr(const ConstantExpr *ce) {
         llvm_unreachable("Invalid constant expression");
     }
 }
+

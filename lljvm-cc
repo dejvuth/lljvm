@@ -38,9 +38,10 @@ def command_exists(name):
     return subprocess.call(['which', name], stdout=fnull) == 0
 
 # C Compiler
-if command_exists('llvm-gcc'): cc = 'llvm-gcc'
-elif command_exists('clang'):  cc = 'clang'
-else:                          cc = None
+#if command_exists('llvm-gcc'): cc = 'llvm-gcc'
+#elif command_exists('clang'):  cc = 'clang'
+#else:                          cc = None
+cc = 'clang'
 
 # default flags to pass to the compiler
 default_cflags = (
@@ -103,33 +104,9 @@ def remove_filext(s):
 
 def call_e(*popenargs, **kwargs):
     """Call the given command, exiting if it has a non-zero return code."""
+    print popenargs
     p = subprocess.Popen(*popenargs, **kwargs)
     if p.wait() != 0: sys.exit(p.returncode)
-
-def call_x(*popenargs, **kwargs):
-    """Call the given command, exiting if it has a non-zero return code."""
-    foundFile = False
-    args = list(*popenargs)
-    compiler = args[0]
-    outputFile = ''
-    del args[0]
-    ccargs = [compiler]
-
-    for arg in args:
-      if arg.startswith('-o'):
-        foundFile = True
-      elif foundFile:
-        outputFile = arg
-        foundFile = False
-        arg = '-'
-      ccargs.append(arg)
-
-    p = subprocess.Popen(ccargs, stdout=subprocess.PIPE)
-    q = subprocess.Popen(['llvm-as', '-f', '-o=' + outputFile], stdin=p.stdout)
-    stdout, stderr = q.communicate()
-    i = p.wait()
-    q.wait()
-    if i != 0: sys.exit(p.returncode)
 
 def parse_argv(separate_sources=True):
     """Parse sys.argv, returning the flags and the output file, and separating
@@ -149,7 +126,7 @@ def parse_argv(separate_sources=True):
             flags.append(sys.argv.pop(0))
         else:
             flags.append(arg)
-    
+
     if separate_sources:
         return flags, output, srcs
     return flags, output
@@ -201,30 +178,38 @@ def bc2class(output, flags):
         elif flag.startswith('-l') \
          and flag not in ('-link','-link-as-library'):
             java_libs.append('lib' + flag[2:])
-    
+
+    # call lljvm-backend
     output_j = open(output + '.j', 'w')
+    cmd = [os.path.join(lljvm_dir, 'lljvm-backend'), output + '.bc'] + filter_backend_flags(flags)
+    print cmd
     backend_process = subprocess.Popen(
-        [os.path.join(lljvm_dir, 'lljvm-backend'), output + '.bc']
-        + filter_backend_flags(flags),
+        cmd,
         stdout=subprocess.PIPE)
+
+    # link library to .j
     env = {'CLASSPATH': ':'.join(classpath+[os.environ.get('CLASSPATH','.')])}
+    cmd = ['java', 'lljvm.tools.ld.Main'] + java_libs
+    print cmd, env
     linker_returncode = subprocess.Popen(
-        ['java', 'lljvm.tools.ld.Main'] + java_libs,
+        cmd,
         env=env, stdin=backend_process.stdout, stdout=output_j).wait()
     output_j.close()
-    
+
     if linker_returncode != 0:
         backend_process.kill()
         sys.exit(linker_returncode)
     if backend_process.wait() != 0:
         sys.exit(backend_process.returncode)
-    os.unlink(output + '.bc')
-    
+    #os.unlink(output + '.bc')
+
+    # .j -> .class
     outpath = os.path.dirname(output) or '.'
-    call_e(['java', 'jasmin.Main', '-d', outpath, output + '.j'], stdout=fnull)
-    if '-g3' not in flags:
-        os.unlink(output + '.j')
-    
+    #call_e(['java', 'jasmin.Main', '-d', outpath, output + '.j'], stdout=fnull)
+    call_e(['jasmin', '-d', outpath, output + '.j'], stdout=fnull)
+    #if '-g3' not in flags:
+    #    os.unlink(output + '.j')
+
     if '-link-as-library' not in flags:
         classname = os.path.basename(output).replace('.', '_')
         for flag in flags:
@@ -237,11 +222,13 @@ def bc2class(output, flags):
 
 def link(flags, output):
     """Call llvm-ld with the given flags, and call bc2class on the output."""
-    if '-link-as-library' in flags: flags += ['-o', output + '.bc']
-    else:                           flags += ['-o', output]
+    #if '-link-as-library' in flags: flags += ['-o', output + '.bc']
+    #else:                           flags += ['-o', output]
+    #print flags
+    flags += ['-o', output + '.bc']
     call_e(['llvm-link'] + filter_ld_flags(flags))
-    if '-link-as-library' not in flags:
-        os.unlink(output)
+    #if '-link-as-library' not in flags:
+    #    os.unlink(output)
     bc2class(output, flags)
 
 def main():
@@ -250,12 +237,17 @@ def main():
         link(*parse_argv(False)); return
     if '-c' in sys.argv or '-E' in sys.argv:
         flags = filter_cc_flags(sys.argv)
-        call_x([cc, "-flto", "-S"] + list(default_cflags) + flags); return
-#        call_e([cc, "-flto", "-S"] + list(default_cflags) + flags); return
+        call_e([cc, "-emit-llvm"] + list(default_cflags) + flags); return
     flags, output, srcs = parse_argv()
     objs = map(lambda src: remove_filext(os.path.basename(src)) + '.o', srcs)
-    call_x([cc, '-flto', '-c'] + list(default_cflags)
+    call_e([cc, '-flto', '-c'] + list(default_cflags)
            + filter_cc_flags(flags) + srcs)
     link(flags + objs, output)
-    map(os.unlink, objs)
+
+    #  disassemble bitcode
+    #call_e(['llvm-dis', output + '.bc', '-o', output + '.ll'])
+
+    #map(os.unlink, objs)
 if __name__ == '__main__': main()
+
+

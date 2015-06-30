@@ -1,6 +1,7 @@
-CXX := c++
-CFLAGS := $(shell llvm-config --cxxflags --ldflags \
-                              --libs bitreader codegen selectiondag)
+CXX := clang++
+CFLAGS := $(shell llvm-config --cxxflags) -fno-exceptions -fno-rtti
+LDFLAGS := $(shell llvm-config --ldflags --libs --system-libs)
+
 OBJS := \
     main.o \
     backend.o \
@@ -20,7 +21,7 @@ OBJS := \
 all: lljvm-backend
 
 lljvm-backend: ${OBJS}
-	$(CXX) ${OBJS} ${CFLAGS} -o lljvm-backend
+	$(CXX) ${OBJS} ${LDFLAGS} -o lljvm-backend
 
 doc:
 	doxygen
@@ -33,3 +34,4 @@ clean:
 	$(CXX) ${CFLAGS} -c $<
 
 ${OBJS}: backend.h
+

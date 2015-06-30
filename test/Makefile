@@ -34,3 +34,6 @@ check: ${TESTS}
 	    echo ACTUAL; cat $*.actual; \
 	fi
 	rm -f $*.expected $*.actual
+
+clean:
+	rm -f *.bc *.j *.class *.o
